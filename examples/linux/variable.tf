@@ -1,3 +1,25 @@
+variable "service_principal" {
+  type = "map"
+
+  default = {
+    subscription_id = ""
+    tenant_id       = ""
+    client_id       = ""
+    client_secret   = ""
+  }
+}
+
+variable "remote_state" {
+  type = "map"
+
+  default = {
+    storage_account_name = ""
+    container_name       = ""
+    key                  = ""
+    access_key           = ""
+  }
+}
+
 variable "vnet" {
   type = "map"
 
@@ -22,15 +44,6 @@ variable "avset" {
   }
 }
 
-variable "sa" {
-  type = "map"
-
-  default = {
-    resource_group_name = ""
-    name                = ""
-  }
-}
-
 variable "common" {
   type = "map"
 
@@ -43,16 +56,8 @@ variable "default" {
   type = "map"
 
   default = {
-    location = ""
-    vm_size  = ""
-
-    admin_username = ""
-    key_data_path  = ""
-
-    os_disk_on_termination = true
-
-    os_disk_type    = ""
-    os_disk_size_gb = ""
+    vnet_resource_group_name = ""
+    vnet_name                = ""
   }
 }
 
