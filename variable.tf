@@ -1,10 +1,10 @@
-variable "vnet" {
+variable "subnet" {
   type = "map"
 
   default = {
     resource_group_name = ""
+    vnet_name           = ""
     name                = ""
-    subnet_name         = ""
   }
 }
 
@@ -13,7 +13,7 @@ variable "avset" {
 
   default = {
     name     = ""
-    location = ""
+    location = "japaneast"
 
     platform_fault_domain_count  = 2
     platform_update_domain_count = 5
@@ -31,19 +31,13 @@ variable "sa" {
   }
 }
 
-variable "common" {
-  type = "map"
-
-  default = {
-    resource_group_name = ""
-  }
-}
-
 variable "default" {
   type = "map"
 
   default = {
-    location = ""
+    resource_group_name = ""
+
+    location = "japaneast"
     vm_size  = ""
 
     admin_username = ""
@@ -53,6 +47,8 @@ variable "default" {
 
     os_disk_type    = ""
     os_disk_size_gb = ""
+
+    private_ip_address_allocation = "dynamic"
   }
 }
 

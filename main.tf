@@ -1,8 +1,8 @@
 data "azurerm_subnet" "subnet" {
-  resource_group_name  = "${var.vnet["resource_group_name"]}"
-  virtual_network_name = "${var.vnet["name"]}"
+  resource_group_name  = "${var.subnet["resource_group_name"]}"
+  virtual_network_name = "${var.subnet["vnet_name"]}"
 
-  name = "${var.vnet["subnet_name"]}"
+  name = "${var.subnet["name"]}"
 }
 
 data "azurerm_storage_account" "sa" {
@@ -13,7 +13,7 @@ data "azurerm_storage_account" "sa" {
 resource "azurerm_network_interface" "nics" {
   count = "${length(var.computes)}"
 
-  resource_group_name = "${var.common["resource_group_name"]}"
+  resource_group_name = "${var.default["resource_group_name"]}"
 
   name     = "${lookup(var.computes[count.index], "name")}-nic"
   location = "${lookup(var.computes[count.index], "location", var.default["location"])}"
@@ -30,7 +30,7 @@ resource "azurerm_network_interface" "nics" {
 resource "azurerm_availability_set" "avset" {
   count = "${var.avset["name"] == "" ? 0 : 1}"
 
-  resource_group_name = "${var.common["resource_group_name"]}"
+  resource_group_name = "${var.default["resource_group_name"]}"
 
   name     = "${var.avset["name"]}"
   location = "${var.avset["location"]}"
@@ -44,7 +44,7 @@ resource "azurerm_availability_set" "avset" {
 resource "azurerm_virtual_machine" "vms" {
   count = "${length(var.computes)}"
 
-  resource_group_name = "${var.common["resource_group_name"]}"
+  resource_group_name = "${var.default["resource_group_name"]}"
 
   name     = "${lookup(var.computes[count.index], "name")}"
   location = "${lookup(var.computes[count.index], "location", var.default["location"])}"
