@@ -1,6 +1,4 @@
 variable "subnet" {
-  type = "map"
-
   default = {
     resource_group_name = ""
     vnet_name           = ""
@@ -8,10 +6,54 @@ variable "subnet" {
   }
 }
 
-variable "avset" {
-  type = "map"
-
+variable "storage_account" {
   default = {
+    resource_group_name = ""
+    name                = ""
+  }
+}
+
+variable "load_balancer" {
+  default = {
+    name     = ""
+    location = "japaneast"
+  }
+}
+
+variable "compute" {
+  default = {
+    resource_group_name = ""
+
+    name     = ""
+    location = "japaneast"
+    vm_size  = ""
+
+    admin_username = ""
+    key_data_path  = ""
+
+    os_disk_type       = ""
+    os_disk_size_gb    = ""
+    os_image_publisher = ""
+    os_image_offer     = ""
+    os_image_sku       = ""
+    os_image_version   = ""
+
+    os_disk_on_termination = true
+
+    private_ip_address = ""
+
+    boot_diagnostics_enabled = true
+  }
+}
+
+variable "computes" {
+  default = []
+}
+
+variable "avset" {
+  default = {
+    exists = true
+
     name     = ""
     location = "japaneast"
 
@@ -20,40 +62,4 @@ variable "avset" {
 
     managed = true
   }
-}
-
-variable "sa" {
-  type = "map"
-
-  default = {
-    resource_group_name = ""
-    name                = ""
-  }
-}
-
-variable "default" {
-  type = "map"
-
-  default = {
-    resource_group_name = ""
-
-    location = "japaneast"
-    vm_size  = ""
-
-    admin_username = ""
-    key_data_path  = ""
-
-    os_disk_on_termination = true
-
-    os_disk_type    = ""
-    os_disk_size_gb = ""
-
-    private_ip_address_allocation = "dynamic"
-  }
-}
-
-variable "computes" {
-  type = "list"
-
-  default = []
 }
