@@ -1,10 +1,65 @@
 locals {
   vm_name_format = "${var.compute["name"]}-%02d"
+  lb_name        = "${var.lb["ip_type"] == "public" ? "${var.compute["name"]}-lb" : "${var.compute["name"]}-ilb"}"
 
-  # custom_image > snapshot > azure_image
-  disk_type = "${var.image["name"] != "" ? "custom_image" : var.snapshot["name"] != "" ? "snapshot" : "azure_image"}"
+  # image > platform_image
+  disk_type = "${var.image["name"] != "" ? "image" : "platform_image"}"
 }
 
+# load_balancer
+resource "azurerm_public_ip" "ip" {
+  count = "${var.lb["exists"] && var.lb["ip_type"] == "public" ? 1 : 0}"
+
+  resource_group_name = "${var.compute["resource_group_name"]}"
+
+  name     = "${local.lb_name}-ip"
+  location = "${var.lb["location"]}"
+
+  domain_name_label            = "${var.lb["domain_name_label"] != "" ? var.lb["domain_name_label"] : var.compute["name"]}"
+  public_ip_address_allocation = "${var.lb["ip_address_allocation"]}"
+}
+
+resource "azurerm_lb" "lb" {
+  count = "${var.lb["exists"] && var.lb["ip_type"] == "public" ? 1 : 0}"
+
+  resource_group_name = "${var.compute["resource_group_name"]}"
+
+  name     = "${var.compute["name"]}-lb"
+  location = "${var.lb["location"]}"
+
+  frontend_ip_configuration {
+    name = "${var.compute["name"]}-ip-config"
+
+    public_ip_address_id = "${azurerm_public_ip.ip.id}"
+  }
+}
+
+data "azurerm_subnet" "lb_subnet" {
+  count = "${var.lb["exists"] && var.lb["ip_type"] == "private" ? 1 : 0}"
+
+  resource_group_name  = "${var.lb_subnet["resource_group_name"]}"
+  virtual_network_name = "${var.lb_subnet["vnet_name"]}"
+  name                 = "${var.lb_subnet["name"]}"
+}
+
+resource "azurerm_lb" "ilb" {
+  count = "${var.lb["exists"] && var.lb["ip_type"] == "private" ? 1 : 0}"
+
+  resource_group_name = "${var.compute["resource_group_name"]}"
+
+  name     = "${var.compute["name"]}-ilb"
+  location = "${var.lb["location"]}"
+
+  frontend_ip_configuration {
+    name = "${var.compute["name"]}-ip-config"
+
+    private_ip_address_allocation = "${var.lb["private_ip_address"] != "" ? "Static" : "Dynamic"}"
+    private_ip_address            = "${var.lb["private_ip_address"]}"
+    subnet_id                     = "${data.azurerm_subnet.lb_subnet.id}"
+  }
+}
+
+# virtual_machine
 data "azurerm_subnet" "subnet" {
   resource_group_name  = "${var.subnet["resource_group_name"]}"
   virtual_network_name = "${var.subnet["vnet_name"]}"
@@ -19,17 +74,19 @@ data "azurerm_storage_account" "storage_account" {
 }
 
 data "azurerm_image" "image" {
-  count = "${local.disk_type == "custom_image" ? 1 : 0}"
+  count = "${local.disk_type == "image" ? 1 : 0}"
 
   resource_group_name = "${var.image["resource_group_name"]}"
   name                = "${var.image["name"]}"
 }
 
-data "azurerm_snapshot" "snapshot" {
-  count = "${local.disk_type == "snapshot" ? 1 : 0}"
+data "azurerm_platform_image" "platform_image" {
+  count = "${local.disk_type == "platform_image" ? 1 : 0}"
 
-  resource_group_name = "${var.snapshot["resource_group_name"]}"
-  name                = "${var.snapshot["name"]}"
+  location  = "${var.platform_image["location"]}"
+  publisher = "${local.disk_type == "platform_image" ? var.platform_image["publisher"] : ""}"
+  offer     = "${local.disk_type == "platform_image" ? var.platform_image["offer"] : ""}"
+  sku       = "${local.disk_type == "platform_image" ? var.platform_image["sku"] : ""}"
 }
 
 resource "azurerm_virtual_machine" "vms" {
@@ -56,22 +113,24 @@ resource "azurerm_virtual_machine" "vms" {
   }
 
   storage_os_disk {
-    name              = "${lookup(var.computes[count.index], "name", format(local.vm_name_format, count.index + 1))}-os-disk"
-    caching           = "ReadWrite"
-    create_option     = "${local.disk_type != "snapshot" ? "FromImage" : "Attach"}"
+    name = "${lookup(var.computes[count.index], "name", format(local.vm_name_format, count.index + 1))}-os-disk"
+
+    os_type       = "${var.compute["os_type"]}"
+    caching       = "ReadWrite"
+    create_option = "FromImage"
+
     managed_disk_type = "${lookup(var.computes[count.index], "os_disk_type", var.compute["os_disk_type"])}"
-    managed_disk_id   = "${local.disk_type == "snapshot" ? "${element(azurerm_managed_disk.os_disks.*.id, count.index)}" : ""}"
     disk_size_gb      = "${lookup(var.computes[count.index], "os_disk_size_gb", var.compute["os_disk_size_gb"])}"
   }
 
   delete_os_disk_on_termination = "${lookup(var.computes[count.index], "os_disk_on_termination", var.compute["os_disk_on_termination"])}"
 
-  storage_image_reference = {
-    id        = "${local.disk_type == "custom_image" ? "${join("", data.azurerm_image.image.*.id)}" : ""}"
-    publisher = "${local.disk_type == "azure_image" ? var.compute["os_image_publisher"] : ""}"
-    offer     = "${local.disk_type == "azure_image" ? var.compute["os_image_offer"] : ""}"
-    sku       = "${local.disk_type == "azure_image" ? var.compute["os_image_sku"] : ""}"
-    version   = "${local.disk_type == "azure_image" ? var.compute["os_image_version"] : ""}"
+  storage_image_reference {
+    id        = "${local.disk_type == "image" ? "${join("", data.azurerm_image.image.*.id)}" : ""}"
+    publisher = "${local.disk_type == "platform_image" ? var.platform_image["publisher"] : ""}"
+    offer     = "${local.disk_type == "platform_image" ? var.platform_image["offer"] : ""}"
+    sku       = "${local.disk_type == "platform_image" ? var.platform_image["sku"] : ""}"
+    version   = "${local.disk_type == "platform_image" ? var.platform_image["version"] : ""}"
   }
 
   network_interface_ids = ["${element(azurerm_network_interface.nics.*.id, count.index)}"]
@@ -84,26 +143,8 @@ resource "azurerm_virtual_machine" "vms" {
 
   depends_on = [
     "azurerm_availability_set.avset",
-    "azurerm_managed_disk.os_disks",
     "azurerm_network_interface.nics",
   ]
-}
-
-resource "azurerm_managed_disk" "os_disks" {
-  count = "${local.disk_type == "snapshot" ? length(var.computes) : 0}"
-
-  resource_group_name = "${var.compute["resource_group_name"]}"
-
-  name     = "${lookup(var.computes[count.index], "name", format(local.vm_name_format, count.index + 1))}-os-disk"
-  location = "${lookup(var.computes[count.index], "location", var.compute["location"])}"
-
-  os_type = "${var.compute["os_type"]}"
-
-  create_option        = "Copy"
-  storage_account_type = "${lookup(var.computes[count.index], "os_disk_type", var.compute["os_disk_type"])}"
-  disk_size_gb         = "${lookup(var.computes[count.index], "os_disk_size_gb", var.compute["os_disk_size_gb"])}"
-
-  source_resource_id = "${join("", data.azurerm_snapshot.snapshot.*.id)}"
 }
 
 resource "azurerm_network_interface" "nics" {

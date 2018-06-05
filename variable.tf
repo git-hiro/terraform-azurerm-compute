@@ -1,3 +1,28 @@
+# load_balancer
+variable "lb_subnet" {
+  default = {
+    resource_group_name = ""
+    vnet_name           = ""
+    name                = ""
+  }
+}
+
+variable "lb" {
+  default = {
+    exists   = true
+    location = "japaneast"
+    ip_type  = "public"
+
+    # public
+    domain_name_label     = ""
+    ip_address_allocation = "Dynamic"
+
+    # private
+    private_ip_address = ""
+  }
+}
+
+# virtual_machine
 variable "subnet" {
   default = {
     resource_group_name = ""
@@ -20,17 +45,12 @@ variable "image" {
   }
 }
 
-variable "snapshot" {
+variable "platform_image" {
   default = {
-    resource_group_name = ""
-    name                = ""
-  }
-}
-
-variable "load_balancer" {
-  default = {
-    name     = ""
-    location = "japaneast"
+    publisher = ""
+    offer     = ""
+    sku       = ""
+    version   = ""
   }
 }
 
@@ -46,11 +66,6 @@ variable "compute" {
     key_data_path  = ""
 
     os_type = "Linux"
-
-    os_image_publisher = ""
-    os_image_offer     = ""
-    os_image_sku       = ""
-    os_image_version   = ""
 
     os_disk_type    = ""
     os_disk_size_gb = ""
