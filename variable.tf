@@ -13,6 +13,20 @@ variable "storage_account" {
   }
 }
 
+variable "image" {
+  default = {
+    resource_group_name = ""
+    name                = ""
+  }
+}
+
+variable "snapshot" {
+  default = {
+    resource_group_name = ""
+    name                = ""
+  }
+}
+
 variable "load_balancer" {
   default = {
     name     = ""
@@ -31,12 +45,15 @@ variable "compute" {
     admin_username = ""
     key_data_path  = ""
 
-    os_disk_type       = ""
-    os_disk_size_gb    = ""
+    os_type = "Linux"
+
     os_image_publisher = ""
     os_image_offer     = ""
     os_image_sku       = ""
     os_image_version   = ""
+
+    os_disk_type    = ""
+    os_disk_size_gb = ""
 
     os_disk_on_termination = true
 
