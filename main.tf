@@ -59,6 +59,15 @@ resource "azurerm_lb" "ilb" {
   }
 }
 
+resource "azurerm_lb_backend_address_pool" "bepool" {
+  count = "${var.lb["exists"] ? 1 : 0}"
+
+  resource_group_name = "${var.compute["resource_group_name"]}"
+
+  name            = "${var.compute["name"]}-bepool"
+  loadbalancer_id = "${var.lb["ip_type"] == "public" ? "${join("", azurerm_lb.lb.*.id)}" : "${join("", azurerm_lb.ilb.*.id)}"}"
+}
+
 # virtual_machine
 data "azurerm_subnet" "subnet" {
   resource_group_name  = "${var.subnet["resource_group_name"]}"
@@ -78,15 +87,6 @@ data "azurerm_image" "image" {
 
   resource_group_name = "${var.image["resource_group_name"]}"
   name                = "${var.image["name"]}"
-}
-
-data "azurerm_platform_image" "platform_image" {
-  count = "${local.disk_type == "platform_image" ? 1 : 0}"
-
-  location  = "${var.platform_image["location"]}"
-  publisher = "${local.disk_type == "platform_image" ? var.platform_image["publisher"] : ""}"
-  offer     = "${local.disk_type == "platform_image" ? var.platform_image["offer"] : ""}"
-  sku       = "${local.disk_type == "platform_image" ? var.platform_image["sku"] : ""}"
 }
 
 resource "azurerm_virtual_machine" "vms" {
@@ -161,6 +161,8 @@ resource "azurerm_network_interface" "nics" {
 
     private_ip_address_allocation = "${lookup(var.computes[count.index], "private_ip_address", "") != "" ? "static" : "dynamic"}"
     private_ip_address            = "${lookup(var.computes[count.index], "private_ip_address", "")}"
+
+    load_balancer_backend_address_pools_ids = ["${azurerm_lb_backend_address_pool.bepool.id}"]
   }
 }
 
