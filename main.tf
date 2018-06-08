@@ -1,18 +1,10 @@
-locals {
-  vm_name_format = "${var.compute["name"]}-%02d"
-  lb_name        = "${var.lb["ip_type"] == "public" ? "${var.compute["name"]}-lb" : "${var.compute["name"]}-ilb"}"
-
-  # image > platform_image
-  disk_type = "${var.image["name"] != "" ? "image" : "platform_image"}"
-}
-
-# load_balancer
+# lb
 resource "azurerm_public_ip" "ip" {
-  count = "${var.lb["exists"] && var.lb["ip_type"] == "public" ? 1 : 0}"
+  count = "${var.lb["required"] ? 1 : 0}"
 
   resource_group_name = "${var.compute["resource_group_name"]}"
 
-  name     = "${local.lb_name}-ip"
+  name     = "${var.compute["name"]}-lb-ip"
   location = "${var.lb["location"]}"
 
   domain_name_label            = "${var.lb["domain_name_label"] != "" ? var.lb["domain_name_label"] : var.compute["name"]}"
@@ -20,7 +12,7 @@ resource "azurerm_public_ip" "ip" {
 }
 
 resource "azurerm_lb" "lb" {
-  count = "${var.lb["exists"] && var.lb["ip_type"] == "public" ? 1 : 0}"
+  count = "${var.lb["required"] ? 1 : 0}"
 
   resource_group_name = "${var.compute["resource_group_name"]}"
 
@@ -34,43 +26,62 @@ resource "azurerm_lb" "lb" {
   }
 }
 
-data "azurerm_subnet" "lb_subnet" {
-  count = "${var.lb["exists"] && var.lb["ip_type"] == "private" ? 1 : 0}"
-
-  resource_group_name  = "${var.lb_subnet["resource_group_name"]}"
-  virtual_network_name = "${var.lb_subnet["vnet_name"]}"
-  name                 = "${var.lb_subnet["name"]}"
-}
-
-resource "azurerm_lb" "ilb" {
-  count = "${var.lb["exists"] && var.lb["ip_type"] == "private" ? 1 : 0}"
-
-  resource_group_name = "${var.compute["resource_group_name"]}"
-
-  name     = "${var.compute["name"]}-ilb"
-  location = "${var.lb["location"]}"
-
-  frontend_ip_configuration {
-    name = "${var.compute["name"]}-ip-config"
-
-    private_ip_address_allocation = "${var.lb["private_ip_address"] != "" ? "Static" : "Dynamic"}"
-    private_ip_address            = "${var.lb["private_ip_address"]}"
-    subnet_id                     = "${data.azurerm_subnet.lb_subnet.id}"
-  }
-}
-
-resource "azurerm_lb_backend_address_pool" "bepool" {
-  count = "${var.lb["exists"] ? 1 : 0}"
+resource "azurerm_lb_backend_address_pool" "lb_bepool" {
+  count = "${var.lb["required"] ? 1 : 0}"
 
   resource_group_name = "${var.compute["resource_group_name"]}"
 
   name            = "${var.compute["name"]}-bepool"
-  loadbalancer_id = "${var.lb["ip_type"] == "public" ? "${join("", azurerm_lb.lb.*.id)}" : "${join("", azurerm_lb.ilb.*.id)}"}"
+  loadbalancer_id = "${join("", azurerm_lb.lb.*.id)}"
+}
+
+# ilb
+data "azurerm_subnet" "ilb_subnet" {
+  count = "${var.ilb["required"] ? 1 : 0}"
+
+  resource_group_name  = "${var.ilb["vnet_resource_group_name"]}"
+  virtual_network_name = "${var.ilb["vnet_name"]}"
+  name                 = "${var.ilb["vnet_subnet_name"]}"
+}
+
+resource "azurerm_lb" "ilb" {
+  count = "${var.ilb["required"] ? 1 : 0}"
+
+  resource_group_name = "${var.compute["resource_group_name"]}"
+
+  name     = "${var.compute["name"]}-ilb"
+  location = "${var.ilb["location"]}"
+
+  frontend_ip_configuration {
+    name = "${var.compute["name"]}-ip-config"
+
+    private_ip_address_allocation = "${var.ilb["private_ip_address"] != "" ? "Static" : "Dynamic"}"
+    private_ip_address            = "${var.ilb["private_ip_address"]}"
+    subnet_id                     = "${data.azurerm_subnet.ilb_subnet.id}"
+  }
+}
+
+resource "azurerm_lb_backend_address_pool" "ilb_bepool" {
+  count = "${var.ilb["required"] ? 1 : 0}"
+
+  resource_group_name = "${var.compute["resource_group_name"]}"
+
+  name            = "${var.compute["name"]}-bepool"
+  loadbalancer_id = "${join("", azurerm_lb.ilb.*.id)}"
 }
 
 # virtual_machine
+locals {
+  vm_name_format = "${var.compute["name"]}-%02d"
+
+  # image > platform_image
+  disk_type = "${var.image["name"] != "" ? "image" : "platform_image"}"
+
+  avset_required = "${var.lb["required"] || var.ilb["required"] || var.avset["required"]}"
+}
+
 data "azurerm_subnet" "subnet" {
-  resource_group_name  = "${var.subnet["resource_group_name"]}"
+  resource_group_name  = "${var.subnet["vnet_resource_group_name"]}"
   virtual_network_name = "${var.subnet["vnet_name"]}"
   name                 = "${var.subnet["name"]}"
 }
@@ -134,7 +145,7 @@ resource "azurerm_virtual_machine" "vms" {
   }
 
   network_interface_ids = ["${element(azurerm_network_interface.nics.*.id, count.index)}"]
-  availability_set_id   = "${var.avset["exists"] ? "${join("", azurerm_availability_set.avset.*.id)}" : ""}"
+  availability_set_id   = "${local.avset_required ? "${join("", azurerm_availability_set.avset.*.id)}" : ""}"
 
   boot_diagnostics {
     enabled     = "${var.compute["boot_diagnostics_enabled"] ? lookup(var.computes[count.index], "boot_diagnostics_enabled", var.compute["boot_diagnostics_enabled"]) : false}"
@@ -142,8 +153,8 @@ resource "azurerm_virtual_machine" "vms" {
   }
 
   depends_on = [
-    "azurerm_availability_set.avset",
     "azurerm_network_interface.nics",
+    "azurerm_availability_set.avset",
   ]
 }
 
@@ -162,12 +173,15 @@ resource "azurerm_network_interface" "nics" {
     private_ip_address_allocation = "${lookup(var.computes[count.index], "private_ip_address", "") != "" ? "static" : "dynamic"}"
     private_ip_address            = "${lookup(var.computes[count.index], "private_ip_address", "")}"
 
-    load_balancer_backend_address_pools_ids = ["${azurerm_lb_backend_address_pool.bepool.id}"]
+    load_balancer_backend_address_pools_ids = [
+      "${azurerm_lb_backend_address_pool.lb_bepool.*.id}",
+      "${azurerm_lb_backend_address_pool.ilb_bepool.*.id}",
+    ]
   }
 }
 
 resource "azurerm_availability_set" "avset" {
-  count = "${var.avset["exists"] ? 1 : 0}"
+  count = "${local.avset_required ? 1 : 0}"
 
   resource_group_name = "${var.compute["resource_group_name"]}"
 

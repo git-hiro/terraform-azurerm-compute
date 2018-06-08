@@ -1,23 +1,24 @@
-# load_balancer
-variable "lb_subnet" {
+# lb
+variable "lb" {
   default = {
-    resource_group_name = ""
-    vnet_name           = ""
-    name                = ""
+    required = false
+    location = "japaneast"
+
+    domain_name_label     = ""
+    ip_address_allocation = "Dynamic"
   }
 }
 
-variable "lb" {
+# ilb
+variable "ilb" {
   default = {
-    exists   = true
+    required = false
     location = "japaneast"
-    ip_type  = "public"
 
-    # public
-    domain_name_label     = ""
-    ip_address_allocation = "Dynamic"
+    vnet_resource_group_name = ""
+    vnet_name                = ""
+    vnet_subnet_name         = ""
 
-    # private
     private_ip_address = ""
   }
 }
@@ -25,9 +26,9 @@ variable "lb" {
 # virtual_machine
 variable "subnet" {
   default = {
-    resource_group_name = ""
-    vnet_name           = ""
-    name                = ""
+    vnet_resource_group_name = ""
+    vnet_name                = ""
+    name                     = ""
   }
 }
 
@@ -67,9 +68,8 @@ variable "compute" {
 
     os_type = "Linux"
 
-    os_disk_type    = ""
-    os_disk_size_gb = ""
-
+    os_disk_type           = ""
+    os_disk_size_gb        = ""
     os_disk_on_termination = true
 
     private_ip_address = ""
@@ -82,9 +82,10 @@ variable "computes" {
   default = []
 }
 
+# avset
 variable "avset" {
   default = {
-    exists = true
+    required = false
 
     name     = ""
     location = "japaneast"
