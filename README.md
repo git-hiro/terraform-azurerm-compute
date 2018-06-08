@@ -1,1 +1,1 @@
-# terraform-azurerm-compute
+# terraform-azurerm-linux-from-image
