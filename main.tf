@@ -110,7 +110,7 @@ resource "azurerm_virtual_machine" "vms" {
   vm_size  = "${lookup(var.computes[count.index], "vm_size", var.compute["vm_size"])}"
 
   os_profile {
-    computer_name  = "${lookup(var.computes[count.index], "name", format(local.vm_name_format, count.index + 1))}"
+    computer_name  = "${lookup(var.computes[count.index], "computer_name", format(local.vm_name_format, count.index + 1))}"
     admin_username = "${lookup(var.computes[count.index], "admin_username", var.compute["admin_username"])}"
   }
 
