@@ -1,5 +1,6 @@
 # directories
 .terraform
+examples
 
 # files
 .DS_Store
